@@ -192,7 +192,7 @@ class STFTExactPad(STFTPatch):
 
         return inverse_transform
 
-def custom_stft():
+def custom_stft(x, n_fft : int, hop_length : int, win_length : int, window):
 
     c_stft = stft_patch(
         x,
@@ -398,7 +398,8 @@ class FilterbankFeatures(nn.Module):
 
         # disable autocast to get full range of stft values
         # with torch.cuda.amp.autocast(enabled=False):
-        x = self.stft(x)
+        # x = self.stft(x)
+        x = self.stft(x, self.n_fft, self.hop_length, self.win_length, self.window)
 
         # torch returns real, imag; so convert to magnitude
         if not self.stft_conv:
