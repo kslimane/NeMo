@@ -50,37 +50,39 @@ from nemo.utils import logging
 
 CONSTANT = 1e-5
 
-
-def normalize_batch(x, seq_len, normalize_type):
-    if normalize_type == "per_feature":
-        x_mean = torch.zeros((seq_len.shape[0], x.shape[1]), dtype=x.dtype, device=x.device)
-        x_std = torch.zeros((seq_len.shape[0], x.shape[1]), dtype=x.dtype, device=x.device)
-        for i in range(x.shape[0]):
-            if x[i, :, : seq_len[i]].shape[1] == 1:
-                raise ValueError(
-                    "normalize_batch with `per_feature` normalize_type received a tensor of length 1. This will result "
-                    "in torch.std() returning nan"
-                )
-            x_mean[i, :] = x[i, :, : seq_len[i]].mean(dim=1)
-            x_std[i, :] = x[i, :, : seq_len[i]].std(dim=1)
-        # make sure x_std is not zero
-        x_std += CONSTANT
-        return (x - x_mean.unsqueeze(2)) / x_std.unsqueeze(2)
-    elif normalize_type == "all_features":
-        x_mean = torch.zeros(seq_len.shape, dtype=x.dtype, device=x.device)
-        x_std = torch.zeros(seq_len.shape, dtype=x.dtype, device=x.device)
-        for i in range(x.shape[0]):
-            x_mean[i] = x[i, :, : seq_len[i].item()].mean()
-            x_std[i] = x[i, :, : seq_len[i].item()].std()
-        # make sure x_std is not zero
-        x_std += CONSTANT
-        return (x - x_mean.view(-1, 1, 1)) / x_std.view(-1, 1, 1)
-    elif "fixed_mean" in normalize_type and "fixed_std" in normalize_type:
-        x_mean = torch.tensor(normalize_type["fixed_mean"], device=x.device)
-        x_std = torch.tensor(normalize_type["fixed_std"], device=x.device)
-        return (x - x_mean.view(x.shape[0], x.shape[1]).unsqueeze(2)) / x_std.view(x.shape[0], x.shape[1]).unsqueeze(2)
-    else:
-        return x
+@torch.jit.script
+def normalize_batch(x, seq_len, normalize_type : str):
+    constant = 1e-5
+    # if normalize_type == "per_feature":
+    x_mean = torch.zeros((seq_len.shape[0], x.shape[1]), dtype=x.dtype, device=x.device)
+    x_std = torch.zeros((seq_len.shape[0], x.shape[1]), dtype=x.dtype, device=x.device)
+    for i in range(x.shape[0]):
+        if x[i, :, : seq_len[i]].shape[1] == 1:
+            raise ValueError(
+                "normalize_batch with `per_feature` normalize_type received a tensor of length 1. This will result "
+                "in torch.std() returning nan"
+            )
+        x_mean[i, :] = x[i, :, : seq_len[i]].mean(dim=1)
+        x_std[i, :] = x[i, :, : seq_len[i]].std(dim=1)
+    # make sure x_std is not zero
+    x_std += constant
+    return (x - x_mean.unsqueeze(2)) / x_std.unsqueeze(2)
+    
+    # elif normalize_type == "all_features":
+    #     x_mean = torch.zeros(seq_len.shape, dtype=x.dtype, device=x.device)
+    #     x_std = torch.zeros(seq_len.shape, dtype=x.dtype, device=x.device)
+    #     for i in range(x.shape[0]):
+    #         x_mean[i] = x[i, :, : seq_len[i].item()].mean()
+    #         x_std[i] = x[i, :, : seq_len[i].item()].std()
+    #     # make sure x_std is not zero
+    #     x_std += CONSTANT
+    #     return (x - x_mean.view(-1, 1, 1)) / x_std.view(-1, 1, 1)
+    # elif "fixed_mean" in normalize_type and "fixed_std" in normalize_type:
+    #     x_mean = torch.tensor(normalize_type["fixed_mean"], device=x.device)
+    #     x_std = torch.tensor(normalize_type["fixed_std"], device=x.device)
+    #     return (x - x_mean.view(x.shape[0], x.shape[1]).unsqueeze(2)) / x_std.view(x.shape[0], x.shape[1]).unsqueeze(2)
+    # else:
+    #     return x
 
 
 def splice_frames(x, frame_splicing):
@@ -431,8 +433,8 @@ class FilterbankFeatures(nn.Module):
         #     x = splice_frames(x, self.frame_splicing)
 
         # normalize if required
-        if self.normalize:
-            x = normalize_batch(x, seq_len, normalize_type=self.normalize)
+        # if self.normalize:
+        x = normalize_batch(x, seq_len, normalize_type=self.normalize)
 
         # mask to zero any values beyond seq_len in batch, pad to multiple of `pad_to` (for efficiency)
         max_len = x.size(-1)
