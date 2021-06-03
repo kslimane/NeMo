@@ -380,8 +380,8 @@ class FilterbankFeatures(nn.Module):
             x = torch.cat((x[:, 0].unsqueeze(1), x[:, 1:] - self.preemph * x[:, :-1]), dim=1)
 
         # disable autocast to get full range of stft values
-        with torch.cuda.amp.autocast(enabled=False):
-            x = self.stft(x)
+        # with torch.cuda.amp.autocast(enabled=False):
+        x = self.stft(x)
 
         # torch returns real, imag; so convert to magnitude
         if not self.stft_conv:
