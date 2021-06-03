@@ -351,11 +351,13 @@ class FilterbankFeatures(nn.Module):
             return self.log_zero_guard_value
 
     def get_seq_len(self, seq_len):
-        if isinstance(self.stft, STFT):
-            pad_amount = self.stft.pad_amount * 2
-        else:
+        # if isinstance(self.stft, STFT):
+        #     print('isinstance_stft')
+        #     pad_amount = self.stft.pad_amount * 2
+        # else:
+        #     print('isnotinstance_stft')
             # Assuming that center is True is stft_pad_amount = 0
-            pad_amount = self.stft_pad_amount * 2 if self.stft_pad_amount is not None else self.n_fft // 2 * 2
+        pad_amount = self.stft_pad_amount * 2 if self.stft_pad_amount is not None else self.n_fft // 2 * 2
         seq_len = torch.floor((seq_len + pad_amount - self.n_fft) / self.hop_length) + 1
         return seq_len.to(dtype=torch.long)
 
