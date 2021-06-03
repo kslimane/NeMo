@@ -382,6 +382,7 @@ class FilterbankFeatures(nn.Module):
 
     def forward(self, x, seq_len):
         seq_len = self.get_seq_len(seq_len.float())
+        # constant = 1e-5
 
         if self.stft_pad_amount is not None:
             x = torch.nn.functional.pad(
@@ -404,7 +405,7 @@ class FilterbankFeatures(nn.Module):
         # torch returns real, imag; so convert to magnitude
         if not self.stft_conv:
             # guard is needed for sqrt if grads are passed through
-            guard = 0 if not self.use_grads else CONSTANT
+            guard = 0 # if not self.use_grads else constant
             if x.dtype in [torch.cfloat, torch.cdouble]:
                 x = torch.view_as_real(x)
             x = torch.sqrt(x.pow(2).sum(-1) + guard)
