@@ -427,8 +427,8 @@ class FilterbankFeatures(nn.Module):
                 raise ValueError("log_zero_guard_type was not understood")
 
         # frame splicing if required
-        if self.frame_splicing > 1:
-            x = splice_frames(x, self.frame_splicing)
+        # if self.frame_splicing > 1:
+        #     x = splice_frames(x, self.frame_splicing)
 
         # normalize if required
         if self.normalize:
