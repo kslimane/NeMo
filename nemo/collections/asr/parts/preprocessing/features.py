@@ -173,40 +173,6 @@ def custom_stft(x, n_fft : int, hop_length : int, win_length : int, window):
 
     return c_stft
 
-# @torch.jit.script
-# def normalize_batch(x, seq_len, normalize_type : str, constant : float = 1e-5):
-#     # constant = 1e-5
-#     # if normalize_type == "per_feature":
-#     x_mean = torch.zeros((seq_len.shape[0], x.shape[1]), dtype=x.dtype, device=x.device)
-#     x_std = torch.zeros((seq_len.shape[0], x.shape[1]), dtype=x.dtype, device=x.device)
-#     for i in range(x.shape[0]):
-#         if x[i, :, : seq_len[i]].shape[1] == 1:
-#             raise ValueError(
-#                 "normalize_batch with `per_feature` normalize_type received a tensor of length 1. This will result "
-#                 "in torch.std() returning nan"
-#             )
-#         x_mean[i, :] = x[i, :, : seq_len[i]].mean(dim=1)
-#         x_std[i, :] = x[i, :, : seq_len[i]].std(dim=1)
-#     # make sure x_std is not zero
-#     x_std += constant
-#     return (x - x_mean.unsqueeze(2)) / x_std.unsqueeze(2)
-
-    # elif normalize_type == "all_features":
-    #     x_mean = torch.zeros(seq_len.shape, dtype=x.dtype, device=x.device)
-    #     x_std = torch.zeros(seq_len.shape, dtype=x.dtype, device=x.device)
-    #     for i in range(x.shape[0]):
-    #         x_mean[i] = x[i, :, : seq_len[i].item()].mean()
-    #         x_std[i] = x[i, :, : seq_len[i].item()].std()
-    #     # make sure x_std is not zero
-    #     x_std += CONSTANT
-    #     return (x - x_mean.view(-1, 1, 1)) / x_std.view(-1, 1, 1)
-    # elif "fixed_mean" in normalize_type and "fixed_std" in normalize_type:
-    #     x_mean = torch.tensor(normalize_type["fixed_mean"], device=x.device)
-    #     x_std = torch.tensor(normalize_type["fixed_std"], device=x.device)
-    #     return (x - x_mean.view(x.shape[0], x.shape[1]).unsqueeze(2)) / x_std.view(x.shape[0], x.shape[1]).unsqueeze(2)
-    # else:
-    #     return x
-
 class FilterbankFeatures(nn.Module):
     """Featurizer that converts wavs to Mel Spectrograms.
     See AudioToMelSpectrogramPreprocessor for args.
@@ -396,6 +362,13 @@ class FilterbankFeatures(nn.Module):
         x_std += constant
         return (x - x_mean.unsqueeze(2)) / x_std.unsqueeze(2)
 
+    # @torch.jit.script
+    def padding_to_multiples(self, x, pad_to: int, pad_value: float):
+        pad_amt = x.size(-1) % pad_to
+        if pad_amt != 0:
+            return nn.functional.pad(x, (0, pad_to - pad_amt), value=pad_value)
+        return x
+
     @property
     def filter_banks(self):
         return self.fb
@@ -459,14 +432,17 @@ class FilterbankFeatures(nn.Module):
         max_len = x.size(-1)
         mask = torch.arange(max_len).to(x.device)
         mask = mask.expand(x.size(0), max_len) >= seq_len.unsqueeze(1)
-        x = x.masked_fill(mask.unsqueeze(1).type(torch.bool).to(device=x.device), self.pad_value)
+        # x = x.masked_fill(mask.unsqueeze(1).type(torch.bool).to(device=x.device), self.pad_value)
+        x = x.masked_fill(mask.unsqueeze(1).to(device=x.device), self.pad_value) ### Type is already bool... ?
+
         del mask
         pad_to = self.pad_to
-        if pad_to == "max":
-            x = nn.functional.pad(x, (0, self.max_length - x.size(-1)), value=self.pad_value)
-        elif pad_to > 0:
-            pad_amt = x.size(-1) % pad_to
-            if pad_amt != 0:
-                x = nn.functional.pad(x, (0, pad_to - pad_amt), value=self.pad_value)
+        # if pad_to == "max":
+        #     x = nn.functional.pad(x, (0, self.max_length - x.size(-1)), value=self.pad_value)
+        if pad_to > 0:
+            x = self.padding_to_multiples(x, pad_to, float(self.pad_value))
+            # pad_amt = x.size(-1) % pad_to
+            # if pad_amt != 0:
+            #     x = nn.functional.pad(x, (0, pad_to - pad_amt), value=self.pad_value)
 
         return x, seq_len
