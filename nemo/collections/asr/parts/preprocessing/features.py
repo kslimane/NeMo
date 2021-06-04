@@ -48,42 +48,7 @@ from nemo.collections.asr.parts.preprocessing.segment import AudioSegment
 from nemo.collections.common.parts.patch_utils import stft_patch
 from nemo.utils import logging
 
-CONSTANT = 1e-5
-
-@torch.jit.script
-def normalize_batch(x, seq_len, normalize_type : str):
-    constant = 1e-5
-    # if normalize_type == "per_feature":
-    x_mean = torch.zeros((seq_len.shape[0], x.shape[1]), dtype=x.dtype, device=x.device)
-    x_std = torch.zeros((seq_len.shape[0], x.shape[1]), dtype=x.dtype, device=x.device)
-    for i in range(x.shape[0]):
-        if x[i, :, : seq_len[i]].shape[1] == 1:
-            raise ValueError(
-                "normalize_batch with `per_feature` normalize_type received a tensor of length 1. This will result "
-                "in torch.std() returning nan"
-            )
-        x_mean[i, :] = x[i, :, : seq_len[i]].mean(dim=1)
-        x_std[i, :] = x[i, :, : seq_len[i]].std(dim=1)
-    # make sure x_std is not zero
-    x_std += constant
-    return (x - x_mean.unsqueeze(2)) / x_std.unsqueeze(2)
-    
-    # elif normalize_type == "all_features":
-    #     x_mean = torch.zeros(seq_len.shape, dtype=x.dtype, device=x.device)
-    #     x_std = torch.zeros(seq_len.shape, dtype=x.dtype, device=x.device)
-    #     for i in range(x.shape[0]):
-    #         x_mean[i] = x[i, :, : seq_len[i].item()].mean()
-    #         x_std[i] = x[i, :, : seq_len[i].item()].std()
-    #     # make sure x_std is not zero
-    #     x_std += CONSTANT
-    #     return (x - x_mean.view(-1, 1, 1)) / x_std.view(-1, 1, 1)
-    # elif "fixed_mean" in normalize_type and "fixed_std" in normalize_type:
-    #     x_mean = torch.tensor(normalize_type["fixed_mean"], device=x.device)
-    #     x_std = torch.tensor(normalize_type["fixed_std"], device=x.device)
-    #     return (x - x_mean.view(x.shape[0], x.shape[1]).unsqueeze(2)) / x_std.view(x.shape[0], x.shape[1]).unsqueeze(2)
-    # else:
-    #     return x
-
+# CONSTANT = 1e-5
 
 def splice_frames(x, frame_splicing):
     """ Stacks frames together across feature dim
@@ -208,6 +173,39 @@ def custom_stft(x, n_fft : int, hop_length : int, win_length : int, window):
 
     return c_stft
 
+# @torch.jit.script
+# def normalize_batch(x, seq_len, normalize_type : str, constant : float = 1e-5):
+#     # constant = 1e-5
+#     # if normalize_type == "per_feature":
+#     x_mean = torch.zeros((seq_len.shape[0], x.shape[1]), dtype=x.dtype, device=x.device)
+#     x_std = torch.zeros((seq_len.shape[0], x.shape[1]), dtype=x.dtype, device=x.device)
+#     for i in range(x.shape[0]):
+#         if x[i, :, : seq_len[i]].shape[1] == 1:
+#             raise ValueError(
+#                 "normalize_batch with `per_feature` normalize_type received a tensor of length 1. This will result "
+#                 "in torch.std() returning nan"
+#             )
+#         x_mean[i, :] = x[i, :, : seq_len[i]].mean(dim=1)
+#         x_std[i, :] = x[i, :, : seq_len[i]].std(dim=1)
+#     # make sure x_std is not zero
+#     x_std += constant
+#     return (x - x_mean.unsqueeze(2)) / x_std.unsqueeze(2)
+
+    # elif normalize_type == "all_features":
+    #     x_mean = torch.zeros(seq_len.shape, dtype=x.dtype, device=x.device)
+    #     x_std = torch.zeros(seq_len.shape, dtype=x.dtype, device=x.device)
+    #     for i in range(x.shape[0]):
+    #         x_mean[i] = x[i, :, : seq_len[i].item()].mean()
+    #         x_std[i] = x[i, :, : seq_len[i].item()].std()
+    #     # make sure x_std is not zero
+    #     x_std += CONSTANT
+    #     return (x - x_mean.view(-1, 1, 1)) / x_std.view(-1, 1, 1)
+    # elif "fixed_mean" in normalize_type and "fixed_std" in normalize_type:
+    #     x_mean = torch.tensor(normalize_type["fixed_mean"], device=x.device)
+    #     x_std = torch.tensor(normalize_type["fixed_std"], device=x.device)
+    #     return (x - x_mean.view(x.shape[0], x.shape[1]).unsqueeze(2)) / x_std.view(x.shape[0], x.shape[1]).unsqueeze(2)
+    # else:
+    #     return x
 
 class FilterbankFeatures(nn.Module):
     """Featurizer that converts wavs to Mel Spectrograms.
@@ -229,7 +227,7 @@ class FilterbankFeatures(nn.Module):
         log=True,
         log_zero_guard_type="add",
         log_zero_guard_value=2 ** -24,
-        dither=CONSTANT,
+        dither=1e-5,
         pad_to=16,
         max_duration=16.7,
         frame_splicing=1,
@@ -367,6 +365,7 @@ class FilterbankFeatures(nn.Module):
         else:
             return self.log_zero_guard_value
 
+    # @torch.jit.script
     def get_seq_len(self, seq_len):
         # if isinstance(self.stft, STFT):
         #     print('isinstance_stft')
@@ -374,14 +373,34 @@ class FilterbankFeatures(nn.Module):
         # else:
         #     print('isnotinstance_stft')
             # Assuming that center is True is stft_pad_amount = 0
-        pad_amount = self.stft_pad_amount * 2 if self.stft_pad_amount is not None else self.n_fft // 2 * 2
+        # pad_amount = self.stft_pad_amount * 2 if self.stft_pad_amount is not None else self.n_fft // 2 * 2
+        pad_amount = self.n_fft // 2 * 2 # Torchscript error : self.stat_pad_amount is none since pad_amount is false
+
         seq_len = torch.floor((seq_len + pad_amount - self.n_fft) / self.hop_length) + 1
         return seq_len.to(dtype=torch.long)
+
+    def normalize_batch(self, x, seq_len, normalize_type : str): #, constant : float = 1e-5):
+        constant = 1e-5
+        # if normalize_type == "per_feature":
+        x_mean = torch.zeros((seq_len.shape[0], x.shape[1]), dtype=x.dtype, device=x.device)
+        x_std = torch.zeros((seq_len.shape[0], x.shape[1]), dtype=x.dtype, device=x.device)
+        for i in range(x.shape[0]):
+            if x[i, :, : seq_len[i]].shape[1] == 1:
+                raise ValueError(
+                    "normalize_batch with `per_feature` normalize_type received a tensor of length 1. This will result "
+                    "in torch.std() returning nan"
+                )
+            x_mean[i, :] = x[i, :, : seq_len[i]].mean(dim=1)
+            x_std[i, :] = x[i, :, : seq_len[i]].std(dim=1)
+        # make sure x_std is not zero
+        x_std += constant
+        return (x - x_mean.unsqueeze(2)) / x_std.unsqueeze(2)
 
     @property
     def filter_banks(self):
         return self.fb
 
+    # @torch.jit.script
     def forward(self, x, seq_len):
         seq_len = self.get_seq_len(seq_len.float())
         # constant = 1e-5
@@ -434,7 +453,7 @@ class FilterbankFeatures(nn.Module):
 
         # normalize if required
         # if self.normalize:
-        x = normalize_batch(x, seq_len, normalize_type=self.normalize)
+        x = self.normalize_batch(x, seq_len, normalize_type=self.normalize)
 
         # mask to zero any values beyond seq_len in batch, pad to multiple of `pad_to` (for efficiency)
         max_len = x.size(-1)
