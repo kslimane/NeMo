@@ -79,8 +79,9 @@ class ElementType(ABC):
         When two types are compared their type_parameters must match."""
         return {}
 
+    ### TORCHSCRIPT : Problematic Optional[Tuple], since always none we can replace Tuple with any type, used int for len
     @property
-    def fields(self) -> Optional[Tuple]:
+    def fields(self) -> Optional[int]:
         """This should be used to logically represent tuples/structures. For example, if you want to represent a
         bounding box (x, y, width, height) you can put a tuple with names ('x', y', 'w', 'h') in here.
         Under the hood this should be converted to the last tesnor dimension of fixed size = len(fields).
@@ -116,6 +117,7 @@ class ElementType(ABC):
                     if v1 != second.type_parameters[k1]:
                         return NeuralTypeComparisonResult.SAME_TYPE_INCOMPATIBLE_PARAMS
             # check that all fields match
+            print(self.fields, second.fields)
             if self.fields == second.fields:
                 return NeuralTypeComparisonResult.SAME
             else:
