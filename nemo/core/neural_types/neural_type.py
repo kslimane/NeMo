@@ -48,7 +48,8 @@ class NeuralType(object):
         else:
             return f"axes: None; elements_type: {self.elements_type.__class__.__name__}"
 
-    def __init__(self, axes: Optional[Tuple] = None, elements_type: ElementType = VoidType(), optional=False):
+    ### TORCHSCRIPT : Types precision in axes : Optional[Tuple]
+    def __init__(self, axes: Optional[Tuple[str]] = None, elements_type: ElementType = VoidType(), optional=False):
         if not isinstance(elements_type, ElementType):
             raise ValueError(
                 "elements_type of NeuralType must be an instance of a class derived from ElementType. "
