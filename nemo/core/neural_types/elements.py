@@ -15,6 +15,8 @@
 import abc
 from abc import ABC
 from typing import Dict, Optional, Tuple
+### TORCHSCRIPT To type Dict
+from torch import Tensor
 
 from nemo.core.neural_types.comparison import NeuralTypeComparisonResult
 
@@ -71,15 +73,16 @@ class ElementType(ABC):
     def __repr__(self):
         return self.__class__.__name__
 
+    ### TORCHSCRIPT : Problematic empty Dict, attempting random type
     @property
-    def type_parameters(self) -> Dict:
+    def type_parameters(self) -> Dict[str, Tensor]:
         """Override this property to parametrize your type. For example, you can specify 'storage' type such as
         float, int, bool with 'dtype' keyword. Another example, is if you want to represent a signal with a
         particular property (say, sample frequency), then you can put sample_freq->value in there.
         When two types are compared their type_parameters must match."""
         return {}
 
-    ### TORCHSCRIPT : Problematic Optional[Tuple], since always none we can replace Tuple with any type, used int for len
+    ### TORCHSCRIPT : Problematic empty Optional[Tuple], since always None we can replace Tuple with any type, used int for len
     @property
     def fields(self) -> Optional[int]:
         """This should be used to logically represent tuples/structures. For example, if you want to represent a
@@ -117,7 +120,6 @@ class ElementType(ABC):
                     if v1 != second.type_parameters[k1]:
                         return NeuralTypeComparisonResult.SAME_TYPE_INCOMPATIBLE_PARAMS
             # check that all fields match
-            print(self.fields, second.fields)
             if self.fields == second.fields:
                 return NeuralTypeComparisonResult.SAME
             else:
