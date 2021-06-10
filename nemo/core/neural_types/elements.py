@@ -17,6 +17,8 @@ from abc import ABC
 from typing import Dict, Optional, Tuple
 ### TORCHSCRIPT : To type Dict
 from torch import Tensor
+### TORCHSCRIPT : To decorate BaseType
+import torch
 
 from nemo.core.neural_types.comparison import NeuralTypeComparisonResult
 
@@ -62,8 +64,14 @@ __all__ = [
     'SequenceToSequenceAlignmentType',
 ]
 
+@torch.jit.script
+class BaseType(object):
+    def __init__(self):
+        self.rank = 1
 
-class ElementType(ABC):
+
+# class ElementType(ABC):
+class ElementType(BaseType):
     """Abstract class defining semantics of the tensor elements.
     We are relying on Python for inheritance checking"""
 
@@ -74,9 +82,10 @@ class ElementType(ABC):
     # def __repr__(self):
     #     return self.__class__.__name__
 
-    ### TORCHSCRIPT : We can use type() here as init is not looked at by ts compiler
+    ### TORCHSCRIPT : We can use type() here as init is not looked at by ts compiler (WRONG)
+    ### Trying to write en dur
     def __init__(self):
-        self.type = type(self)
+        self.rank = 1
 
     ### TORCHSCRIPT : Problematic empty Dict, determined type str, Tensor
     @property
@@ -96,20 +105,23 @@ class ElementType(ABC):
         When two types are compared their fields must match."""
         return None
 
-    def compare(self, second) -> NeuralTypeComparisonResult:
+    def compare(self, second : BaseType) -> NeuralTypeComparisonResult:
         # First, check general compatibility
         ### TORCHSCRIPT : Problematic use of unsupported type() method
-        first_t = self.type
-        second_t = second.type
+        
+        first_t = self.rank
+        second_t = second.rank
 
         # first_t = type(self)
         # second_t = type(second)
 
         if first_t == second_t:
             result = NeuralTypeComparisonResult.SAME
-        elif issubclass(first_t, second_t):
+        # elif issubclass(first_t, second_t):
+        elif first_t < second_t:
             result = NeuralTypeComparisonResult.LESS
-        elif issubclass(second_t, first_t):
+        # elif issubclass(second_t, first_t):
+        elif second_t < first_t:
             result = NeuralTypeComparisonResult.GREATER
         else:
             result = NeuralTypeComparisonResult.INCOMPATIBLE
@@ -140,6 +152,8 @@ class VoidType(ElementType):
     It is a good practice to use this type only as necessary.
     For example, when you need template-like functionality.
     """
+    def __init__(self):
+        self.rank = 2
 
     def compare(cls, second: abc.ABCMeta) -> NeuralTypeComparisonResult:
         return NeuralTypeComparisonResult.SAME
@@ -205,7 +219,7 @@ class AudioSignal(ElementType):
     def __init__(self, freq: int = None):
         self._params = {}
         self._params['freq'] = freq
-        self.type = type(self)
+        self.rank = 2
 
     @property
     def type_parameters(self):
