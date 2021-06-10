@@ -15,7 +15,7 @@
 import abc
 from abc import ABC
 from typing import Dict, Optional, Tuple
-### TORCHSCRIPT To type Dict
+### TORCHSCRIPT : To type Dict
 from torch import Tensor
 
 from nemo.core.neural_types.comparison import NeuralTypeComparisonResult
@@ -67,13 +67,18 @@ class ElementType(ABC):
     """Abstract class defining semantics of the tensor elements.
     We are relying on Python for inheritance checking"""
 
-    def __str__(self):
-        return self.__doc__
+    ### TORCHSCRIPT : Crashes but useless
+    # def __str__(self):
+    #     return self.__doc__
 
-    def __repr__(self):
-        return self.__class__.__name__
+    # def __repr__(self):
+    #     return self.__class__.__name__
 
-    ### TORCHSCRIPT : Problematic empty Dict, attempting random type
+    ### TORCHSCRIPT : We can use type() here as init is not looked at by ts compiler
+    def __init__(self):
+        self.type = type(self)
+
+    ### TORCHSCRIPT : Problematic empty Dict, determined type str, Tensor
     @property
     def type_parameters(self) -> Dict[str, Tensor]:
         """Override this property to parametrize your type. For example, you can specify 'storage' type such as
@@ -93,8 +98,12 @@ class ElementType(ABC):
 
     def compare(self, second) -> NeuralTypeComparisonResult:
         # First, check general compatibility
-        first_t = type(self)
-        second_t = type(second)
+        ### TORCHSCRIPT : Problematic use of unsupported type() method
+        first_t = self.type
+        second_t = second.type
+
+        # first_t = type(self)
+        # second_t = type(second)
 
         if first_t == second_t:
             result = NeuralTypeComparisonResult.SAME
@@ -192,9 +201,11 @@ class AudioSignal(ElementType):
         freq is the same.
     """
 
+    ### TORCHSCRIPT : Added type attribute same as ElementType
     def __init__(self, freq: int = None):
         self._params = {}
         self._params['freq'] = freq
+        self.type = type(self)
 
     @property
     def type_parameters(self):
