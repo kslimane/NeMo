@@ -129,6 +129,8 @@ class ElementType(BaseType):
         if result != NeuralTypeComparisonResult.SAME:
             return result
         else:
+            # return NeuralTypeComparisonResult.SAME
+
             # now check that all parameters match
             check_params = set(self.type_parameters.keys()) == set(second.type_parameters.keys())
             if check_params is False:
