@@ -64,6 +64,7 @@ __all__ = [
     'SequenceToSequenceAlignmentType',
 ]
 
+### TORCHSCRIPT : Base Class added for typing ElementType compare method
 @torch.jit.script
 class BaseType(object):
     def __init__(self):
@@ -126,27 +127,29 @@ class ElementType(BaseType):
         else:
             result = NeuralTypeComparisonResult.INCOMPATIBLE
 
-        if result != NeuralTypeComparisonResult.SAME:
-            return result
-        else:
-            # return NeuralTypeComparisonResult.SAME
+        ### TORCHSCRIPT : ComparisonResults return don't seem to be used, dodged
+        return result
 
-            # now check that all parameters match
-            check_params = set(self.type_parameters.keys()) == set(second.type_parameters.keys())
-            if check_params is False:
-                return NeuralTypeComparisonResult.SAME_TYPE_INCOMPATIBLE_PARAMS
-            else:
-                for k1, v1 in self.type_parameters.items():
-                    if v1 is None or second.type_parameters[k1] is None:
-                        # Treat None as Void
-                        continue
-                    if v1 != second.type_parameters[k1]:
-                        return NeuralTypeComparisonResult.SAME_TYPE_INCOMPATIBLE_PARAMS
-            # check that all fields match
-            if self.fields == second.fields:
-                return NeuralTypeComparisonResult.SAME
-            else:
-                return NeuralTypeComparisonResult.INCOMPATIBLE
+        # if result != NeuralTypeComparisonResult.SAME:
+        #     return result
+        # else:
+        #     # now check that all parameters match
+        #     check_params = set(self.type_parameters.keys()) == set(second.type_parameters.keys())
+        #     if check_params is False:
+        #         return NeuralTypeComparisonResult.SAME_TYPE_INCOMPATIBLE_PARAMS
+        #     else:
+        #         for k1, v1 in self.type_parameters.items():
+        #             if v1 is None or second.type_parameters[k1] is None:
+        #                 # Treat None as Void
+        #                 continue
+        #             if v1 != second.type_parameters[k1]:
+        #                 return NeuralTypeComparisonResult.SAME_TYPE_INCOMPATIBLE_PARAMS
+            
+        #     # check that all fields match
+        #     if self.fields == second.fields:
+        #         return NeuralTypeComparisonResult.SAME
+        #     else:
+        #         return NeuralTypeComparisonResult.INCOMPATIBLE
 
 
 class VoidType(ElementType):
@@ -217,7 +220,7 @@ class AudioSignal(ElementType):
         freq is the same.
     """
 
-    ### TORCHSCRIPT : Added type attribute same as ElementType
+    ### TORCHSCRIPT : Added rank attribute same as ElementType
     def __init__(self, freq: int = None):
         self._params = {}
         self._params['freq'] = freq
