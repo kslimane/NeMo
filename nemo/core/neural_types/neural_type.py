@@ -57,6 +57,7 @@ class NeuralType(object):
             )
         self.elements_type = elements_type
         if axes is not None:
+            ### TORCHSCRIPT : Last change, is it needed ?
             NeuralType.__check_sanity(axes)
             axes_list = []
             for axis in axes:
